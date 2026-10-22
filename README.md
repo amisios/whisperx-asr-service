@@ -11,6 +11,24 @@
 
 A simple ASR API service powered by WhisperX for transcription with speaker diarization. Built for self-hosters running [Speakr](https://github.com/murtaza-nasir/speakr) or similar applications.
 
+## About This Fork
+
+This fork of [murtaza-nasir/whisperx-asr-service](https://github.com/murtaza-nasir/whisperx-asr-service) runs on NVIDIA Blackwell Professional GPUs, and can be used from Obsidian. The upstream default image ships PyTorch built for GPUs up to Hopper (sm_90), which does not run on these cards. The rest of this README is the upstream documentation.
+
+**Docker image:** [`armisios/whisperx-asr-service:0.4.3`](https://hub.docker.com/r/armisios/whisperx-asr-service). Use it in place of the `learnedmachine/whisperx-asr-service` images named below.
+
+**Changes from upstream**
+
+- Base image `nvidia/cuda:13.1.2-cudnn-runtime-ubuntu22.04` (CUDA 13 runtime) instead of `ubuntu:22.04`.
+- PyTorch `2.9.0+cu130` as the default build args, which supports Blackwell Professional GPUs.
+- `LD_LIBRARY_PATH` includes the CUDA 13 libraries installed with PyTorch, so they are found at runtime.
+- CORS is enabled for all origins, so browser-based clients such as Obsidian plugins can call the API. Any web page that can reach the service can then call it too.
+- New `POST /asr-diarize` endpoint: an OpenAI-style upload (`file` field) with speaker diarization always on. It returns `text` and `segments`, and exists in simple mode (the default) only.
+
+On a Blackwell Professional GPU, a 50-minute recording with two speakers is transcribed and diarized in about 84 seconds. The host driver must support CUDA 13.1, and CUDA 13 no longer supports Maxwell, Pascal or Volta GPUs (such as the GTX 10xx series).
+
+**Using it from Obsidian:** in the settings of the [Whisper plugin](https://github.com/nikdanilov/whisper-obsidian-plugin), set the API URL to `http://<server-ip>:9000/asr-diarize`, where `<server-ip>` is the LAN address of the machine running the container. Any API key works. The model and language chosen in the plugin are ignored, because this endpoint reads them only from the URL; add `?language=en`, for example, to set the language. The inserted transcript has no speaker labels; those are in the response's `segments`.
+
 > **Two Docker image variants are published per release.**
 >
 > | Device | Pull this tag |

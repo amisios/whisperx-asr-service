@@ -76,6 +76,15 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+from fastapi.middleware.cors import CORSMiddleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 logger.info(f"WhisperX ASR Service v{__version__} initialized on device: {DEVICE}")
 logger.info(f"Compute type: {COMPUTE_TYPE}, Batch size: {BATCH_SIZE}")
 logger.info(f"Models: {describe_model_settings()}; serve mode: {SERVE_MODE}")
@@ -287,6 +296,68 @@ async def transcribe_audio(
             except Exception as e:
                 logger.warning(f"Failed to delete temporary file: {str(e)}")
 
+
+@app.post("/asr-diarize")
+async def transcribe_audio_diarize(
+    file: UploadFile = File(...),
+    model: Optional[str] = Query(None),
+    language: Optional[str] = Query(None),
+    prompt: Optional[str] = Query(None),
+    response_format: Optional[str] = Query("json"),
+    temperature: Optional[float] = Query(0),
+):
+    """
+    OpenAI-compatible endpoint with diarization always enabled.
+    Accepts 'file' field like /v1/audio/transcriptions but routes
+    through the full diarization pipeline.
+    """
+    temp_audio_path = None
+    try:
+        model = resolve_model_name(model)
+    except InvalidModelError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=Path(file.filename).suffix) as temp_file:
+            temp_audio_path = temp_file.name
+            content = await file.read()
+            temp_file.write(content)
+
+        audio = whisperx.load_audio(temp_audio_path)
+
+        result, speaker_embeddings = await run_in_queue(
+            run_pipeline,
+            audio,
+            model_name=model,
+            language=language,
+            task="transcribe",
+            initial_prompt=prompt,
+            hotwords=None,
+            word_timestamps=True,
+            should_diarize=True,
+            num_speakers=None,
+            min_speakers=None,
+            max_speakers=None,
+            return_speaker_embeddings=False,
+        )
+
+        segments = result.get("segments", [])
+        text = " ".join([seg.get("text", "") for seg in segments])
+
+        return JSONResponse(content={"text": text, "segments": segments})
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Diarization transcription error: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+    finally:
+        if temp_audio_path and os.path.exists(temp_audio_path):
+            try:
+                os.unlink(temp_audio_path)
+            except Exception as e:
+                logger.warning(f"Failed to delete temporary file: {str(e)}")
 
 @app.get("/health")
 async def health_check():

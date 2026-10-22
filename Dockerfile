@@ -14,10 +14,10 @@
 # - All pip installs in a single layer so the WhisperX-induced torch
 #   upgrade and subsequent re-pin do not persist as dead layers
 #   (~10 GB of stale torch copies in the previous layering).
-ARG TORCH_VERSION=2.7.1
-ARG TORCH_INDEX_URL=https://download.pytorch.org/whl/cu126
+ARG TORCH_VERSION=2.9.0+cu130
+ARG TORCH_INDEX_URL=https://download.pytorch.org/whl/cu130
 
-FROM ubuntu:22.04
+FROM nvidia/cuda:13.1.2-cudnn-runtime-ubuntu22.04
 
 ARG TORCH_VERSION
 ARG TORCH_INDEX_URL
@@ -62,7 +62,7 @@ RUN python3 -m pip install --no-cache-dir --upgrade pip && \
         "protobuf<7"
 
 # Prefer torch's bundled cuDNN over any system cuDNN
-ENV LD_LIBRARY_PATH=/usr/local/lib/python3.10/dist-packages/torch/lib:/usr/local/lib/python3.10/dist-packages/nvidia/cudnn/lib:$LD_LIBRARY_PATH
+ENV LD_LIBRARY_PATH=/usr/local/lib/python3.10/dist-packages/torch/lib:/usr/local/lib/python3.10/dist-packages/nvidia/cublas/lib:/usr/local/lib/python3.10/dist-packages/nvidia/cu13/lib:/usr/local/lib/python3.10/dist-packages/nvidia/cuda_nvrtc/lib:/usr/local/lib/python3.10/dist-packages/nvidia/cudnn/lib:/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/cuda/lib64
 
 # Pre-download NLTK data for timestamp alignment (enables offline use)
 RUN python3 -c "import nltk; nltk.download('punkt_tab', download_dir='/.cache/nltk_data')"
