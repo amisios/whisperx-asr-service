@@ -19,17 +19,19 @@ if [ "$SERVE_MODE" = "ray" ]; then
     # Silence the FutureWarning about accelerator env var override
     export RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO=0
 
-    # Set Ray Serve's default HTTP bind address and port via env vars so that
-    # serve.run() picks them up without needing a separate serve.start() call
-    # (which would trigger a "new HTTP config is ignored" warning).
-    export RAY_SERVE_DEFAULT_HTTP_HOST="0.0.0.0"
-    export RAY_SERVE_DEFAULT_HTTP_PORT="9000"
-
+    # The Serve HTTP address is passed to serve.start() before serve.run().
+    # RAY_SERVE_DEFAULT_HTTP_PORT is ignored by current Ray releases (checked
+    # on 2.59), and the port then falls back to 8000. The dashboard is bound
+    # to all container interfaces so that the port published by Docker
+    # Compose (127.0.0.1 only) can reach it. It is protected by Ray token
+    # authentication, which is enabled by default for local clusters (see
+    # README "Ray Dashboard Access").
     exec python3 -c "
 import ray
 from ray import serve
 
-ray.init()
+ray.init(dashboard_host='0.0.0.0')
+serve.start(http_options={'host': '0.0.0.0', 'port': 9000})
 
 from app.serve_app import app
 serve.run(app, blocking=True)

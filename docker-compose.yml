@@ -19,7 +19,10 @@ services:
 
     ports:
       - "9000:9000"
-      - "${RAY_DASHBOARD_PORT:-8265}:8265"  # Ray dashboard (only used in ray mode)
+      # Ray dashboard (ray mode only). Bound to localhost because jobs submitted
+      # through it are executed as code in the container; see README
+      # "Ray Dashboard Access".
+      - "127.0.0.1:${RAY_DASHBOARD_PORT:-8265}:8265"
 
     # Ray uses /dev/shm for object store
     shm_size: '8g'

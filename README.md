@@ -733,7 +733,24 @@ ALIGN_NUM_REPLICAS=1    ALIGN_GPU_FRACTION=1.0
 DIARIZE_NUM_REPLICAS=1  DIARIZE_GPU_FRACTION=1.0
 ```
 
-When running in Ray mode, the Ray Dashboard is available at `http://localhost:8265` for monitoring deployments, replicas, and request metrics.
+When running in Ray mode, the Ray Dashboard is available at `http://localhost:8265` on the Docker host for monitoring deployments, replicas, and request metrics.
+
+##### Ray Dashboard Access
+
+Jobs submitted through the Ray Dashboard are executed as code inside the container. For this reason, port 8265 is published on `127.0.0.1` only in the Compose files, and the dashboard cannot be reached from other machines on the network. To open it from another machine, use an SSH tunnel to the Docker host:
+
+```bash
+ssh -L 8265:localhost:8265 user@docker-host
+# then open http://localhost:8265 in a local browser
+```
+
+Ray token authentication is enabled by default, and the token is requested when the dashboard is opened. A new token is generated each time the container starts; it can be read with:
+
+```bash
+docker exec whisperx-asr-api cat /root/.ray/auth_token
+```
+
+`RAY_DASHBOARD_PORT` changes the host port. Publishing the dashboard on all interfaces (for example `"8265:8265"` in an override file) is not recommended unless access is also restricted by a firewall or an authenticating reverse proxy.
 
 ##### GPU Pinning
 
@@ -876,7 +893,7 @@ docker compose up -d
 docker compose logs -f
 ```
 
-**Note:** When using Ray Serve mode, Docker Compose is configured with `shm_size: 8g` for Ray's shared memory object store. The Ray Dashboard is exposed on port 8265.
+**Note:** When using Ray Serve mode, Docker Compose is configured with `shm_size: 8g` for Ray's shared memory object store. The Ray Dashboard is published on `127.0.0.1:8265` only (see [Ray Dashboard Access](#ray-dashboard-access)).
 
 ## Monitoring and Logs
 
@@ -941,8 +958,8 @@ read 0 (or be missing) in Ray Serve mode. These counters and gauges are
 per-process; without `prometheus_client` multi-process mode the ingress'
 registry never sees the replica's events. HTTP-level metrics (request
 counts, durations, audio sizes) are accurate in both modes because they
-are recorded inside the ingress handler. Use the Ray Dashboard at port
-8265 for per-replica state, and tail `serve/replica_*` log files for
+are recorded inside the ingress handler. Use the Ray Dashboard (`http://localhost:8265`
+on the Docker host) for per-replica state, and tail `serve/replica_*` log files for
 eviction events. Multi-process metrics support is a planned follow-up.
 
 In simple mode (`SERVE_MODE=simple`) all metrics including the eviction
@@ -966,8 +983,9 @@ nvidia-smi -l 1
 # Docker container stats
 docker stats whisperx-asr-api
 
-# Ray Dashboard (Ray mode only)
-# Open http://localhost:8265 in your browser
+# Ray Dashboard (Ray mode only, localhost on the Docker host)
+# Open http://localhost:8265 in a browser on the Docker host,
+# or through an SSH tunnel: ssh -L 8265:localhost:8265 user@docker-host
 ```
 
 ## Offline Use
