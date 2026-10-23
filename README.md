@@ -1264,6 +1264,24 @@ For issues and questions:
 
 ## Changelog
 
+### v0.4.4 (2026-10-23)
+
+**Security**
+
+- **Web stack updated for known vulnerabilities:** FastAPI 0.104.1 is replaced by 0.162.0, Starlette 0.27.0 by 1.7.0 (minimum 1.3.1), python-multipart 0.0.6 by 0.0.32, Uvicorn 0.24.0 by 0.54.0 and Pydantic 2.5.0 by 2.14.1. Fixes for the Starlette and python-multipart advisories on multipart parsing (denial of service and arbitrary file write, including CVE-2024-47874 and CVE-2026-24486) are included. Malformed multipart requests receive a 400 response, as do requests with a form field larger than 1 MB or with more than 1000 fields or files. No changes to the request or response format were needed.
+- **Minimum versions for dependencies with advisories:** Ray `>=2.56.0`, anyio `>=4.14.2`, urllib3 `>=2.8.0`, aiohttp `>=3.14.4`, nltk `>=3.10.3`, msgpack `>=1.2.1`, fsspec `>=2026.6.0`, lightning `>=2.6.6`, certifi `>=2026.10.19` and virtualenv `>=21.14.9`. Ubuntu security updates (including openssl 3.0.2-0ubuntu1.30) are applied during the build. The PyTorch versions are unchanged.
+- **Ray Dashboard bound to localhost:** port 8265 is published on `127.0.0.1` only in the Compose files, since jobs submitted through the dashboard are executed as code inside the container. Ray token authentication, enabled by default in current Ray releases, also applies to the dashboard. See [Ray Dashboard Access](#ray-dashboard-access) for SSH tunnel access and the token.
+
+**Fixes**
+
+- **Ray Serve HTTP port set explicitly:** `RAY_SERVE_DEFAULT_HTTP_PORT` is ignored by Ray 2.59, and with the Ray update the API would have started on port 8000 instead of 9000 in Ray Serve mode. The HTTP address is now passed to `serve.start()`.
+- **Ray Dashboard reachable through the published port:** in earlier images, the dashboard was bound to the container's loopback interface and could not be opened from the host, although port 8265 was published.
+
+**Known remaining findings**
+
+- Pillow 12.3.0 has advisories fixed in Pillow 13.0.0, which requires Python 3.11. The image uses the Python 3.10 of Ubuntu 22.04, so this update requires a change of base image and is left for a later release.
+- Ray 2.59.0, the latest release, bundles aiohttp 3.14.3 for its runtime environment agent and Jackson 2.18.8 in its Java JAR; these copies are updated only with a Ray release. pip 26.2.2, the latest release, vendors msgpack 1.1.2, urllib3 2.7.0 and setuptools 70.3.0; these are used only when packages are installed.
+
 ### v0.4.3 (2026-10-11)
 
 **Improvements**
