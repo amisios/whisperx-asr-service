@@ -21,16 +21,20 @@ if [ "$SERVE_MODE" = "ray" ]; then
 
     # The Serve HTTP address is passed to serve.start() before serve.run().
     # RAY_SERVE_DEFAULT_HTTP_PORT is ignored by current Ray releases (checked
-    # on 2.59), and the port then falls back to 8000. The dashboard is bound
-    # to all container interfaces so that the port published by Docker
-    # Compose (127.0.0.1 only) can reach it. It is protected by Ray token
-    # authentication, which is enabled by default for local clusters (see
-    # README "Ray Dashboard Access").
+    # on 2.59), and the port then falls back to 8000.
+    #
+    # The dashboard listens on the container's loopback interface unless
+    # RAY_DASHBOARD_HOST is set (0.0.0.0 makes the published port reachable).
+    # It stays off the network by default, as in earlier releases, because
+    # jobs submitted through it run as code in the container (see README
+    # "Ray Dashboard Access").
+    export RAY_DASHBOARD_HOST="${RAY_DASHBOARD_HOST:-127.0.0.1}"
     exec python3 -c "
+import os
 import ray
 from ray import serve
 
-ray.init(dashboard_host='0.0.0.0')
+ray.init(dashboard_host=os.environ['RAY_DASHBOARD_HOST'])
 serve.start(http_options={'host': '0.0.0.0', 'port': 9000})
 
 from app.serve_app import app
