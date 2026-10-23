@@ -23,11 +23,11 @@ This fork of [murtaza-nasir/whisperx-asr-service](https://github.com/murtaza-nas
 - PyTorch `2.9.0+cu130` as the default build args, which supports Blackwell Professional GPUs.
 - `LD_LIBRARY_PATH` includes the CUDA 13 libraries installed with PyTorch, so they are found at runtime.
 - CORS is enabled for all origins, so browser-based clients such as Obsidian plugins can call the API. Any web page that can reach the service can then call it too.
-- New `POST /asr-diarize` endpoint: an OpenAI-style upload (`file` field) with speaker diarization always on. It returns `text` and `segments`, and exists in simple mode (the default) only.
+- New `POST /asr-diarize` endpoint: an OpenAI-style upload (`file` field) with speaker diarization always on. It returns `text` as speaker turns, plus `segments`, and exists in simple mode (the default) only.
 
 On a Blackwell Professional GPU, a 50-minute recording with two speakers is transcribed and diarized in about 84 seconds. The host driver must support CUDA 13.1, and CUDA 13 no longer supports Maxwell, Pascal or Volta GPUs (such as the GTX 10xx series).
 
-**Using it from Obsidian:** in the settings of the [Whisper plugin](https://github.com/nikdanilov/whisper-obsidian-plugin), set the API URL to `http://<server-ip>:9000/asr-diarize`, where `<server-ip>` is the LAN address of the machine running the container. Any API key works. The model and language chosen in the plugin are ignored, because this endpoint reads them only from the URL; add `?language=en`, for example, to set the language. The inserted transcript has no speaker labels; those are in the response's `segments`.
+**Using it from Obsidian:** in the settings of the [Whisper plugin](https://github.com/nikdanilov/whisper-obsidian-plugin), set the API URL to `http://<server-ip>:9000/asr-diarize`, where `<server-ip>` is the LAN address of the machine running the container. Any API key works. The model and language chosen in the plugin are ignored, because this endpoint reads them only from the URL; add `?language=en`, for example, to set the language. The transcript arrives as one paragraph per speaker turn, such as `**SPEAKER_00** [03:12]: …`. Set `RESEGMENT_BY_SPEAKER=true` in `.env` so that a new turn starts wherever the speaker changes, not only between segments.
 
 > **Two Docker image variants are published per release.**
 >

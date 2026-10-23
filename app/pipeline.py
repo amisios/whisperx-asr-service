@@ -986,6 +986,41 @@ def format_timestamp(seconds: float) -> str:
     return f"{hours:02d}:{minutes:02d}:{secs:02d},{millis:03d}"
 
 
+def format_speaker_transcript(segments: List[dict]) -> str:
+    """Render segments as speaker turns, one paragraph per turn:
+    "**SPEAKER_00** [mm:ss]: text". Consecutive segments of the same speaker
+    are merged into one turn; minutes keep counting past the hour.
+
+    Segments carry no speaker when diarization was skipped or failed (see
+    diarize()); the plain transcript is returned then rather than a single
+    UNKNOWN turn.
+    """
+    if not any(seg.get("speaker") for seg in segments):
+        return " ".join(seg.get("text", "") for seg in segments)
+
+    def mmss(t: Optional[float]) -> str:
+        t = int(t or 0)
+        return f"{t // 60:02d}:{t % 60:02d}"
+
+    lines: List[str] = []
+    cur_spk, cur_txt, cur_start = None, [], 0.0
+    for seg in segments:
+        spk = seg.get("speaker") or "UNKNOWN"
+        txt = seg.get("text", "").strip()
+        if not txt:
+            continue
+        if spk != cur_spk:
+            if cur_txt:
+                lines.append(f"**{cur_spk}** [{mmss(cur_start)}]: {' '.join(cur_txt)}")
+            cur_spk, cur_txt, cur_start = spk, [txt], seg.get("start", 0.0)
+        else:
+            cur_txt.append(txt)
+    if cur_txt:
+        lines.append(f"**{cur_spk}** [{mmss(cur_start)}]: {' '.join(cur_txt)}")
+
+    return "\n\n".join(lines)
+
+
 # ---------------------------------------------------------------------------
 # Convenience: full pipeline in one call
 # ---------------------------------------------------------------------------

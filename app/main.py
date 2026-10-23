@@ -28,6 +28,7 @@ from app.pipeline import (
     load_whisper_model,
     clear_gpu_memory,
     format_timestamp,
+    format_speaker_transcript,
     sanitize_float_values,
     run_pipeline,
     resolve_model_name,
@@ -342,7 +343,7 @@ async def transcribe_audio_diarize(
         )
 
         segments = result.get("segments", [])
-        text = " ".join([seg.get("text", "") for seg in segments])
+        text = format_speaker_transcript(segments)
 
         return JSONResponse(content={"text": text, "segments": segments})
 
