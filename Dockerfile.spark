@@ -58,7 +58,9 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 WORKDIR /workspace
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Ubuntu security updates newer than the ubuntu:22.04 base image (e.g.
+# openssl) are applied with apt-get upgrade.
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
     python3.10 \
     python3-pip \
     ffmpeg \
@@ -73,7 +75,8 @@ RUN ldconfig
 
 # Single layer: CTranslate2 wheel first so nothing pulls the CPU-only PyPI
 # build, then torch pin -> WhisperX (silently upgrades torch) -> pyannote ->
-# torch re-pin -> transformers -> API deps.
+# torch re-pin -> transformers -> API deps -> security floors for transitive
+# dependencies (only-if-needed upgrades, so torch keeps its pin).
 RUN python3 -m pip install --no-cache-dir --upgrade pip && \
     pip3 install --no-cache-dir /tmp/ct2-wheel/*.whl && rm -rf /tmp/ct2-wheel && \
     pip3 install --no-cache-dir \
@@ -90,13 +93,24 @@ RUN python3 -m pip install --no-cache-dir --upgrade pip && \
         --index-url ${TORCH_INDEX_URL} && \
     pip3 install --no-cache-dir "transformers>=5.13,<6" && \
     pip3 install --no-cache-dir \
-        fastapi==0.104.1 \
-        "uvicorn[standard]==0.24.0" \
-        python-multipart==0.0.6 \
-        pydantic==2.5.0 \
+        fastapi==0.162.0 \
+        "starlette>=1.3.1" \
+        "uvicorn[standard]==0.54.0" \
+        python-multipart==0.0.32 \
+        pydantic==2.14.1 \
         prometheus-client==0.20.0 \
-        "ray[serve]>=2.9" \
-        "protobuf<7"
+        "ray[serve]>=2.56.0" \
+        "protobuf<7" && \
+    pip3 install --no-cache-dir \
+        "anyio>=4.14.2" \
+        "urllib3>=2.8.0" \
+        "aiohttp>=3.14.4" \
+        "nltk>=3.10.3" \
+        "msgpack>=1.2.1" \
+        "fsspec>=2026.6.0" \
+        "lightning>=2.6.6" \
+        "certifi>=2026.10.19" \
+        "virtualenv>=21.14.9"
 
 # Prefer torch's bundled cuDNN over any system cuDNN
 ENV LD_LIBRARY_PATH=/usr/local/lib/python3.10/dist-packages/torch/lib:/usr/local/lib/python3.10/dist-packages/nvidia/cudnn/lib:/usr/local/lib
