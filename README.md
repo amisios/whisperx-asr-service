@@ -15,7 +15,7 @@ A simple ASR API service powered by WhisperX for transcription with speaker diar
 
 This fork of [murtaza-nasir/whisperx-asr-service](https://github.com/murtaza-nasir/whisperx-asr-service) runs on NVIDIA Blackwell Professional GPUs, and can be used from Obsidian. The upstream default image ships PyTorch built for GPUs up to Hopper (sm_90), which does not run on these cards. The rest of this README is the upstream documentation.
 
-**Docker image:** [`armisios/whisperx-asr-service:0.4.3.1`](https://hub.docker.com/r/armisios/whisperx-asr-service). Use it in place of the `learnedmachine/whisperx-asr-service` images named below. The first three numbers of the version are the upstream release this fork is based on; the fourth counts this fork's own versions on top of it.
+**Docker image:** [`armisios/whisperx-asr-service:0.4.4.1`](https://hub.docker.com/r/armisios/whisperx-asr-service). Use it in place of the `learnedmachine/whisperx-asr-service` images named below. The first three numbers of the version are the upstream release this fork is based on; the fourth counts this fork's own versions on top of it.
 
 **Changes from upstream**
 
@@ -751,7 +751,24 @@ ALIGN_NUM_REPLICAS=1    ALIGN_GPU_FRACTION=1.0
 DIARIZE_NUM_REPLICAS=1  DIARIZE_GPU_FRACTION=1.0
 ```
 
-When running in Ray mode, the Ray Dashboard is available at `http://localhost:8265` for monitoring deployments, replicas, and request metrics.
+When running in Ray mode, the Ray Dashboard is available at `http://localhost:8265` on the Docker host for monitoring deployments, replicas, and request metrics.
+
+##### Ray Dashboard Access
+
+Jobs submitted through the Ray Dashboard are executed as code inside the container. For this reason, the dashboard is not reachable by default: it listens only inside the container. To use it, set `RAY_DASHBOARD_HOST=0.0.0.0` in `.env` and recreate the container. Port 8265 is published on `127.0.0.1` only in the Compose files, so the dashboard can then be opened at `http://localhost:8265` on the Docker host. To open it from another machine, use an SSH tunnel to the Docker host:
+
+```bash
+ssh -L 8265:localhost:8265 user@docker-host
+# then open http://localhost:8265 in a local browser
+```
+
+Ray token authentication is enabled by default, and the token is requested when the dashboard is opened. A new token is generated each time the container starts; it can be read with:
+
+```bash
+docker exec whisperx-asr-api cat /root/.ray/auth_token
+```
+
+`RAY_DASHBOARD_PORT` changes the host port. Publishing the dashboard on all interfaces (for example `"8265:8265"` in an override file) is not recommended unless access is also restricted by a firewall or an authenticating reverse proxy.
 
 ##### GPU Pinning
 
@@ -894,7 +911,7 @@ docker compose up -d
 docker compose logs -f
 ```
 
-**Note:** When using Ray Serve mode, Docker Compose is configured with `shm_size: 8g` for Ray's shared memory object store. The Ray Dashboard is exposed on port 8265.
+**Note:** When using Ray Serve mode, Docker Compose is configured with `shm_size: 8g` for Ray's shared memory object store. The Ray Dashboard is off by default and, when enabled, published on `127.0.0.1:8265` only (see [Ray Dashboard Access](#ray-dashboard-access)).
 
 ## Monitoring and Logs
 
@@ -959,8 +976,8 @@ read 0 (or be missing) in Ray Serve mode. These counters and gauges are
 per-process; without `prometheus_client` multi-process mode the ingress'
 registry never sees the replica's events. HTTP-level metrics (request
 counts, durations, audio sizes) are accurate in both modes because they
-are recorded inside the ingress handler. Use the Ray Dashboard at port
-8265 for per-replica state, and tail `serve/replica_*` log files for
+are recorded inside the ingress handler. Use the Ray Dashboard (`http://localhost:8265`
+on the Docker host) for per-replica state, and tail `serve/replica_*` log files for
 eviction events. Multi-process metrics support is a planned follow-up.
 
 In simple mode (`SERVE_MODE=simple`) all metrics including the eviction
@@ -984,8 +1001,9 @@ nvidia-smi -l 1
 # Docker container stats
 docker stats whisperx-asr-api
 
-# Ray Dashboard (Ray mode only)
-# Open http://localhost:8265 in your browser
+# Ray Dashboard (Ray mode only, localhost on the Docker host)
+# Open http://localhost:8265 in a browser on the Docker host,
+# or through an SSH tunnel: ssh -L 8265:localhost:8265 user@docker-host
 ```
 
 ## Offline Use
@@ -1263,6 +1281,31 @@ For issues and questions:
 - **Docker WhisperX:** [jim60105/docker-whisperX](https://github.com/jim60105/docker-whisperX)
 
 ## Changelog
+
+### v0.4.4 (2026-10-23)
+
+**Upgrade notes**
+
+- No configuration changes are required. Existing model cache volumes are reused without a new download, and transcripts, speaker labels and word timestamps on the test recordings are identical to v0.4.3.
+- Ray Serve mode: the Ray Dashboard stays unreachable by default, as in earlier releases. Compose files from earlier releases publish port 8265 on all interfaces; before enabling the dashboard with `RAY_DASHBOARD_HOST=0.0.0.0`, change that line to the `127.0.0.1` mapping in the current `docker-compose.yml`.
+- Multipart limits of the updated web stack: a request with a form field larger than 1 MB, or with more than 1000 fields or files, receives a 400 response. Uploaded audio files are not affected by the 1 MB limit; `MAX_FILE_SIZE_MB` still applies to them.
+- Newer releases of transformers (5.20), huggingface_hub (2.3) and CTranslate2 (4.8.3) are included in the image. The PyTorch version is unchanged.
+
+**Security**
+
+- **Web stack updated for known vulnerabilities:** FastAPI 0.104.1 is replaced by 0.162.0, Starlette 0.27.0 by 1.7.0 (minimum 1.3.1), python-multipart 0.0.6 by 0.0.32, Uvicorn 0.24.0 by 0.54.0 and Pydantic 2.5.0 by 2.14.1. Fixes for the Starlette and python-multipart advisories on multipart parsing (denial of service and arbitrary file write, including CVE-2024-47874 and CVE-2026-24486) are included. Malformed multipart requests receive a 400 response, as do requests with a form field larger than 1 MB or with more than 1000 fields or files. No changes to the request or response format were needed.
+- **Minimum versions for dependencies with advisories:** Ray `>=2.56.0`, anyio `>=4.14.2`, urllib3 `>=2.8.0`, aiohttp `>=3.14.4`, nltk `>=3.10.3`, msgpack `>=1.2.1`, fsspec `>=2026.6.0`, lightning `>=2.6.6`, certifi `>=2026.10.19` and virtualenv `>=21.14.9`. Ubuntu security updates (including openssl 3.0.2-0ubuntu1.30) are applied during the build. The PyTorch versions are unchanged.
+- **Ray Dashboard bound to localhost:** port 8265 is published on `127.0.0.1` only in the Compose files, since jobs submitted through the dashboard are executed as code inside the container. The dashboard remains unreachable by default, as in earlier releases, and is enabled with `RAY_DASHBOARD_HOST=0.0.0.0`. Ray token authentication, enabled by default in current Ray releases, also applies to the dashboard. See [Ray Dashboard Access](#ray-dashboard-access) for SSH tunnel access and the token.
+
+**Fixes**
+
+- **Ray Serve HTTP port set explicitly:** `RAY_SERVE_DEFAULT_HTTP_PORT` is ignored by Ray 2.59, and with the Ray update the API would have started on port 8000 instead of 9000 in Ray Serve mode. The HTTP address is now passed to `serve.start()`.
+- **Ray Dashboard can be opened through the published port:** in earlier images, the dashboard was bound to the container's loopback interface and could not be opened from the host, although port 8265 was published. It can now be enabled with `RAY_DASHBOARD_HOST=0.0.0.0`.
+
+**Known remaining findings**
+
+- Pillow 12.3.0 has advisories fixed in Pillow 13.0.0, which requires Python 3.11. The image uses the Python 3.10 of Ubuntu 22.04, so this update requires a change of base image and is left for a later release.
+- Ray 2.59.0, the latest release, bundles aiohttp 3.14.3 for its runtime environment agent and Jackson 2.18.8 in its Java JAR; these copies are updated only with a Ray release. pip 26.2.2, the latest release, vendors msgpack 1.1.2, urllib3 2.7.0 and setuptools 70.3.0; these are used only when packages are installed.
 
 ### v0.4.3 (2026-10-11)
 
