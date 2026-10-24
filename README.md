@@ -15,7 +15,7 @@ A simple ASR API service powered by WhisperX for transcription with speaker diar
 
 This fork of [murtaza-nasir/whisperx-asr-service](https://github.com/murtaza-nasir/whisperx-asr-service) runs on NVIDIA Blackwell Professional GPUs, and can be used from Obsidian. The upstream default image ships PyTorch built for GPUs up to Hopper (sm_90), which does not run on these cards. The rest of this README is the upstream documentation.
 
-**Docker image:** [`armisios/whisperx-asr-service:0.4.3`](https://hub.docker.com/r/armisios/whisperx-asr-service). Use it in place of the `learnedmachine/whisperx-asr-service` images named below.
+**Docker image:** [`armisios/whisperx-asr-service:0.4.3.1`](https://hub.docker.com/r/armisios/whisperx-asr-service). Use it in place of the `learnedmachine/whisperx-asr-service` images named below. The first three numbers of the version are the upstream release this fork is based on; the fourth counts this fork's own versions on top of it.
 
 **Changes from upstream**
 
